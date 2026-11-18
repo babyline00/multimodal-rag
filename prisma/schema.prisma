@@ -1,0 +1,59 @@
+// Multimodal RAG (Text + Image + Table) — Prisma schema
+// SQLite database. Isolated DB file lives at ../../apps/75-multimodal-rag/db/custom.db
+// (absolute path overridden by .env / inline `DATABASE_URL` in package.json scripts).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Document {
+  id        String          @id @default(cuid())
+  filename  String
+  source    String          @default("upload-pdf")
+  pageCount Int             @default(0)
+  ingestedAt DateTime       @default(now())
+  chunks    DocumentChunk[]
+}
+
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  documentId  String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  ordinal    Int
+  modality   String   // "text" | "image" | "table"
+  pageNumber Int
+  heading    String?
+  content    String   // text body / placeholder description for image / markdown for table
+  bbox       String?  // null for MVP — real CLIP/ColPali path will populate it
+  tokens     String   // JSON-encoded string[]
+  embedding  String   // JSON-encoded Float32Array
+  createdAt  DateTime @default(now())
+
+  @@index([documentId])
+  @@index([modality])
+}
+
+model ChatSession {
+  id        String       @id @default(cuid())
+  title     String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  citations String?
+  createdAt DateTime    @default(now())
+
+  @@index([sessionId])
+}
